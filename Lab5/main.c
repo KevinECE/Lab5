@@ -4,6 +4,7 @@
 #include "G8RTOS_Semaphores.h"
 #include "Threads.h"
 #include "LCDLib.h"
+#include "Game.h"
 
 //extern semaphore_t sem_sensor;
 //extern semaphore_t sem_LED;
@@ -65,9 +66,9 @@ void PORT4_IRQHandler(void){
  */
 void main(void)
 {
-	WDT_A->CTL = WDT_A_CTL_PW | WDT_A_CTL_HOLD;		// stop watchdog timer
+    WDT_A->CTL = WDT_A_CTL_PW | WDT_A_CTL_HOLD;     // stop watchdog timer
 
-	G8RTOS_Init();
+    G8RTOS_Init();
 
     uartInit();
 
@@ -75,5 +76,5 @@ void main(void)
 
     initCC3100(Host);
 
-	G8RTOS_Launch();
+    G8RTOS_Launch();
 }

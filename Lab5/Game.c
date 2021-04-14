@@ -4,7 +4,7 @@
  *  Created on: Apr 7, 2021
  *      Author: user
  */
-// My name is cleveland brown
+
 #include "LCDLib.h"
 #include "msp.h"
 #include "driverlib.h"
@@ -26,6 +26,7 @@ int16_t scaleP1 = 1;
 
 // All the balls
 Ball_t balls[MAX_NUM_OF_BALLS];
+
 // All the players
 GeneralPlayerInfo_t players[MAX_NUM_OF_PLAYERS];
 
@@ -66,7 +67,7 @@ void JoinGame(){
     };
 
     // send player info to host
-    SendData((uint8_t)clientPlayer, clientPlayer.IP_address, sizeof((uint8_t)clientPlayer));
+    SendData((uint8_t *)&clientPlayer, clientPlayer.IP_address, sizeof(clientPlayer));
 
     // wait for server response
 
@@ -83,7 +84,7 @@ void JoinGame(){
  */
 void ReceiveDataFromHost()
 {
-    int32_t retVal = ReceiveData();
+//    int32_t retVal = ReceiveData();
 
     // Continually receive data until retVal > 0 (meaning valid data has been read)
 }
@@ -94,7 +95,7 @@ void ReceiveDataFromHost()
 void SendDataToHost()
 {
     // send player info to host
-    SendData((uint8_t)clientPlayer, clientPlayer.IP_address, sizeof((uint8_t)clientPlayer));
+    SendData((uint8_t *)&clientPlayer, clientPlayer.IP_address, sizeof(clientPlayer));
     // sleep for 2ms
     OS_Sleep(2);
 }
@@ -320,7 +321,7 @@ void UpdateBallOnScreen(PrevBall_t * previousBall, Ball_t * currentBall, uint16_
     else{
         LCD_DrawRectangle(previousBall->CenterX - BALL_SIZE_D2,
                           previousBall->CenterX + BALL_SIZE_D2,
-                          previousBall->CenterY - BALL_SIZE_D2,rt
+                          previousBall->CenterY - BALL_SIZE_D2,
                           previousBall->CenterY + BALL_SIZE_D2,
                           LCD_BLACK);
         LCD_DrawRectangle(currentBall->currentCenterX - BALL_SIZE_D2,

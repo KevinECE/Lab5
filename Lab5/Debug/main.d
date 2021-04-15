@@ -52,7 +52,27 @@ main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/BoardSupportPackage/Driv
 main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/BoardSupportPackage/DriverLib/wdt_a.h
 main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/G8RTOS_Empty_Lab2/G8RTOS_Scheduler.h
 main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/G8RTOS_Empty_Lab2/G8RTOS_Semaphores.h
-main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/G8RTOS_Empty_Lab2/Threads.h
+main.obj: ../Game.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/G8RTOS_Empty_Lab2/G8RTOS.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/cc3100_usage/cc3100_usage.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/simplelink.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/user.h
+main.obj: C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.4.LTS/include/string.h
+main.obj: C:/ti/ccs1011/ccs/ccs_base/arm/include/msp432.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/board/board.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/spi_cc3100/spi_cc3100.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/../source/nonos.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/../source/objInclusion.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/simplelink.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/trace.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/fs.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/socket.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/netapp.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/wlan.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/device.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/netcfg.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/wlan_rx_filters.h
+main.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/SL_Common/sl_common.h
 main.obj: ../LCDLib.h
 
 ../main.c: 
@@ -107,5 +127,25 @@ C:/Users/Matthew\ Merriman/workspace_v10/Lab5/BoardSupportPackage/DriverLib/uart
 C:/Users/Matthew\ Merriman/workspace_v10/Lab5/BoardSupportPackage/DriverLib/wdt_a.h: 
 C:/Users/Matthew\ Merriman/workspace_v10/Lab5/G8RTOS_Empty_Lab2/G8RTOS_Scheduler.h: 
 C:/Users/Matthew\ Merriman/workspace_v10/Lab5/G8RTOS_Empty_Lab2/G8RTOS_Semaphores.h: 
-C:/Users/Matthew\ Merriman/workspace_v10/Lab5/G8RTOS_Empty_Lab2/Threads.h: 
+../Game.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/G8RTOS_Empty_Lab2/G8RTOS.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/cc3100_usage/cc3100_usage.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/simplelink.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/user.h: 
+C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.4.LTS/include/string.h: 
+C:/ti/ccs1011/ccs/ccs_base/arm/include/msp432.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/board/board.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/spi_cc3100/spi_cc3100.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/../source/nonos.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/../source/objInclusion.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/simplelink.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/trace.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/fs.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/socket.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/netapp.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/wlan.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/device.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/netcfg.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/simplelink/include/wlan_rx_filters.h: 
+C:/Users/Matthew\ Merriman/workspace_v10/Lab5/CC3100SupportPackage/SL_Common/sl_common.h: 
 ../LCDLib.h: 

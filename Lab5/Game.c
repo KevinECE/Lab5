@@ -22,32 +22,90 @@ semaphore_t LEDMutex;
 semaphore_t sensorMutex;
 semaphore_t ballMutex;
 
-// Scaling factors for velocities of balls
-int16_t scaleX = 1;
+
+int16_t scaleX = 1;                                     // Scaling factors for velocities of balls
 int16_t scaleY = 1;
-
-// All the balls
-Ball_t balls[MAX_NUM_OF_BALLS];
-// All the players
-GeneralPlayerInfo_t players[MAX_NUM_OF_PLAYERS];
-
-// Previous ball positions
-PrevBall_t prevBalls[MAX_NUM_OF_BALLS];
-// Previous player positions
-PrevPlayer_t prevPlayers[MAX_NUM_OF_PLAYERS];
-
-// Points for bottom and top players
-uint8_t points_bottom = 0;
+Ball_t balls[MAX_NUM_OF_BALLS];                         // All the balls
+GeneralPlayerInfo_t players[MAX_NUM_OF_PLAYERS];        // All the players
+SpecificPlayerInfo_t clientPlayer;                      // Player info
+GameState_t gameState;                                  // Game state
+PrevBall_t prevBalls[MAX_NUM_OF_BALLS];                 // Previous ball positions
+PrevPlayer_t prevPlayers[MAX_NUM_OF_PLAYERS];           // Previous player positions
+uint8_t points_bottom = 0;                              // Points for bottom and top players
 uint8_t points_top = 0;
 uint16_t blueLED = 0x0000;
 uint16_t redLED = 0x0000;
+uint8_t gameOver = 0;                                   // Status of game
+bool flagButton = false;                                // Button press flag for restart
 
-// Status of game
-uint8_t gameOver = 0;
+/*********************************************** Client Threads *********************************************************************/
+/*
+ * Thread for client to join game
+ */
+void JoinGame(){
+    // set specific player info, probably call getLoaclIP() to get IP
+    clientPlayer = (SpecificPlayerInfo_t) {
+        .IP_address   = getLocalIP(),
+        .displacement = 0,
+        .playerNumber = 1,
+        .acknowledge  = 0,
+        .ready        = 0,
+        .joined       = 1
+    };
 
-// Button press flag for restart
-bool flagButton = false;
+    // send player info to host
+    SendData((uint8_t *)&clientPlayer, clientPlayer.IP_address, sizeof(clientPlayer));
 
+    // wait for server response
+
+    // send acknowledge, light LED
+
+    // Initialize board state
+
+    //
+
+}
+
+/*
+ * Thread that receives game state packets from host
+ */
+void ReceiveDataFromHost()
+{
+    int32_t retVal = ReceiveData();
+
+    // Continually receive data until retVal > 0 (meaning valid data has been read)
+    while(!(retVal > 0))
+    {
+        retVal = ReceiveData((uint8_t *)&gameState, sizeof(gameState));
+    }
+}
+
+/*
+ * Thread that sends UDP packets to host
+ */
+void SendDataToHost()
+{
+    // send player info to host
+    SendData((uint8_t *)&clientPlayer, clientPlayer.IP_address, sizeof(clientPlayer));
+    // sleep for 2ms
+    OS_Sleep(2);
+}
+
+/*
+ * Thread to read client's joystick
+ */
+void ReadJoystickClient();
+
+/*
+ * End of game for the client
+ */
+void EndOfGameClient();
+/*********************************************** Client Threads *********************************************************************/
+
+/*********************************************** Host Threads *********************************************************************/
+/*
+ * Thread for the host to create a game
+ */
 void CreateGame(){
     // Initialize the players
     int i;
@@ -96,201 +154,40 @@ void CreateGame(){
     G8RTOS_KillSelf();
 }
 
-void EndOfGameHost(){
-    // Wait for all semaphores to be released, although need to make sure no deadlocks so maybe need to change later
-    G8RTOS_WaitSemaphore(&LCDMutex);
-    G8RTOS_WaitSemaphore(&LEDMutex);
-    G8RTOS_WaitSemaphore(&sensorMutex);
-    G8RTOS_WaitSemaphore(&ballMutex);
-    // Kill all other threads
-    G8RTOS_KillOthers();
-    // Kill all balls
-    int i;
-    for(i = 0; i < MAX_NUM_OF_BALLS; i++){
-        balls[i].alive = false;
-    }
-    // Re-initialize all semaphores
-    G8RTOS_SignalSemaphore(&LCDMutex);
-    G8RTOS_SignalSemaphore(&LEDMutex);
-    G8RTOS_SignalSemaphore(&sensorMutex);
-    G8RTOS_SignalSemaphore(&ballMutex);
-    G8RTOS_InitSemaphore(&LCDMutex, 1);
-    G8RTOS_InitSemaphore(&LEDMutex, 1);
-    G8RTOS_InitSemaphore(&sensorMutex, 1);
-    G8RTOS_InitSemaphore(&ballMutex, 1);
-    // Clear screen with winner's color
-    if(points_bottom >= points_top){
-        LCD_Clear(LCD_BLUE);
-    }
-    else{
-        LCD_Clear(LCD_RED);
-    }
-    // Print message to wait for restart
-    uint8_t str[] = "Wait for Restart...";
-    LCD_Text(MAX_SCREEN_X / 4, MAX_SCREEN_Y / 2, str, LCD_WHITE);
-    // Create aperiodic thread that waits for restart from host - TODO
-    // G8RTOS_AddAPeriodicEvent(LCDTap, 4, PORT4_IRQn);
-    // Decide to maybe just add the thread in the beginning and we can just enable the interrupt here
-    flagButton = false;
-    P4->IFG &= ~BIT4;
-    P4->IE |= BIT4;
-    G8RTOS_AddAPeriodicEvent(buttonPress, 4, PORT4_IRQn);
-    // Wait for button to set a global flag
-    while(!flagButton);
-    // Send notification to client - TODO - probably done in CreateGame() instead
+/*
+ * Thread that sends game state to client
+ */
+void SendDataToClient()
+{
+    // Send packet
+    SendData((uint8_t *)&gameState, getLocalIP(), sizeof(gameState));
 
-    // Re-initialize
-    G8RTOS_AddThread(CreateGame, 4, "create");
-    // Kill self
-    G8RTOS_KillSelf();
+    // Check if game is done
+    if(gameOver == 1)
+    {
+        G8RTOS_AddThread(EndOfGameHost(), 0, "End game");
+    }
+
+    OS_Sleep(5);
 }
 
-void buttonPress(){
-    __NVIC_DisableIRQ(PORT4_IRQn);
-    P4->IE &= ~BIT4;
-    flagButton = true;
-}
+/*
+ * Thread that receives UDP packets from client
+ */
+void ReceiveDataFromClient()
+{
+    int32_t retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
 
-void MoveLEDs(){
-    while(1){
-        G8RTOS_WaitSemaphore(&LEDMutex);
-        LP3943_LedModeSet(BLUE, blueLED);
-        LP3943_LedModeSet(RED, redLED);
-        G8RTOS_SignalSemaphore(&LEDMutex);
-        // may change later
-        OS_Sleep(10);
+    // Continually receive data until retVal > 0 (meaning valid data has been read)
+    while(!(retVal > 0))
+    {
+        retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
     }
 }
 
-void DrawObjects(){
-    while(1){
-        // Temporary: check if game ends, will move to another thread later
-        if(gameOver){
-            G8RTOS_AddThread(EndOfGameHost, 3, "end");
-            OS_Sleep(1);
-        }
-        // iterates through all the alive balls
-        int i;
-        for(i = 0; i < MAX_NUM_OF_BALLS; i++){
-            if(balls[i].alive){
-                // call the function to update the ball's drawing
-                G8RTOS_WaitSemaphore(&ballMutex);
-                G8RTOS_WaitSemaphore(&LCDMutex);
-                UpdateBallOnScreen(&prevBalls[i], &balls[i], balls[i].color);
-                G8RTOS_SignalSemaphore(&LCDMutex);
-                // update previous ball's position
-                prevBalls[i].CenterX = balls[i].currentCenterX;
-                prevBalls[i].CenterY = balls[i].currentCenterY;
-                G8RTOS_SignalSemaphore(&ballMutex);
-            }
-        }
-        // players[0] is bottom and players[1] is top
-        // call the functions to update the players' drawings
-        G8RTOS_WaitSemaphore(&sensorMutex);
-        G8RTOS_WaitSemaphore(&LCDMutex);
-        UpdatePlayerOnScreen(&prevPlayers[0], &players[0]);
-        UpdatePlayerOnScreen(&prevPlayers[1], &players[1]);
-        G8RTOS_SignalSemaphore(&LCDMutex);
-        // update the previous players' positions
-        prevPlayers[0].Center = players[0].currentCenter;
-        prevPlayers[1].Center = players[1].currentCenter;
-        G8RTOS_SignalSemaphore(&sensorMutex);
-        // sleep for 20 ms
-        OS_Sleep(20);
-    }
-}
-
-void UpdateBallOnScreen(PrevBall_t * previousBall, Ball_t * currentBall, uint16_t outColor){
-    // if the previous ball's position is 0, then this ball has just been initialized
-    if(previousBall->CenterX == 0){
-        LCD_DrawRectangle(currentBall->currentCenterX - BALL_SIZE_D2,
-                          currentBall->currentCenterX + BALL_SIZE_D2,
-                          currentBall->currentCenterY - BALL_SIZE_D2,
-                          currentBall->currentCenterY + BALL_SIZE_D2,
-                          outColor);
-    }
-    // else we just clear previous position and update to new position
-    else{
-        LCD_DrawRectangle(previousBall->CenterX - BALL_SIZE_D2,
-                          previousBall->CenterX + BALL_SIZE_D2,
-                          previousBall->CenterY - BALL_SIZE_D2,
-                          previousBall->CenterY + BALL_SIZE_D2,
-                          LCD_BLACK);
-        LCD_DrawRectangle(currentBall->currentCenterX - BALL_SIZE_D2,
-                          currentBall->currentCenterX + BALL_SIZE_D2,
-                          currentBall->currentCenterY - BALL_SIZE_D2,
-                          currentBall->currentCenterY + BALL_SIZE_D2,
-                          outColor);
-    }
-}
-
-void UpdatePlayerOnScreen(PrevPlayer_t * prevPlayerIn, GeneralPlayerInfo_t * outPlayer){
-    // check to see which player, then set up corresponding values for the Y upper and lower bounds
-    uint8_t upperBound = ARENA_MIN_Y;
-    uint8_t lowerBound = TOP_PADDLE_EDGE;
-    if(outPlayer->position == BOTTOM){
-        upperBound = BOTTOM_PADDLE_EDGE;
-        lowerBound = ARENA_MAX_Y;
-    }
-    // Compare the old and new center positions, keep all the overlapping squares and update the remaining ones
-    // if move to the right
-    if(outPlayer->currentCenter > prevPlayerIn->Center){
-        // calculate overlapping bounds
-        // one problem with this implementation is that the paddle MUST NOT move too far in one update cycle so there is no overlap
-        int16_t leftBound = outPlayer->currentCenter - PADDLE_LEN_D2;
-        int16_t rightBound = prevPlayerIn->Center + PADDLE_LEN_D2;
-        // clear the tail
-        LCD_DrawRectangle(prevPlayerIn->Center - PADDLE_LEN_D2,
-                          leftBound,
-                          upperBound,
-                          lowerBound,
-                          LCD_BLACK);
-        // update the head
-        LCD_DrawRectangle(rightBound,
-                          outPlayer->currentCenter + PADDLE_LEN_D2,
-                          upperBound,
-                          lowerBound,
-                          outPlayer->color);
-    }
-    // else move to the left
-    else if(outPlayer->currentCenter < prevPlayerIn->Center){
-        // calculate overlapping bounds
-        // one problem with this implementation is that the paddle MUST NOT move too far in one update cycle so there is no overlap
-        int16_t leftBound = prevPlayerIn->Center - PADDLE_LEN_D2;
-        int16_t rightBound = outPlayer->currentCenter + PADDLE_LEN_D2;
-        // clear the tail
-        LCD_DrawRectangle(rightBound,
-                          prevPlayerIn->Center + PADDLE_LEN_D2,
-                          upperBound,
-                          lowerBound,
-                          LCD_BLACK);
-        // update the head
-        LCD_DrawRectangle(outPlayer->currentCenter - PADDLE_LEN_D2,
-                          leftBound,
-                          upperBound,
-                          lowerBound,
-                          outPlayer->color);
-    }
-}
-
-void DrawPlayer(GeneralPlayerInfo_t * player){
-    if(player->position == TOP){
-        // currentCenter is just the x-position since y will always stay the same
-        LCD_DrawRectangle(player->currentCenter - PADDLE_LEN_D2,
-                          player->currentCenter + PADDLE_LEN_D2,
-                          TOP_PLAYER_CENTER_Y - PADDLE_WID_D2,
-                          TOP_PLAYER_CENTER_Y + PADDLE_WID_D2,
-                          player->color);
-    }
-    else{
-        LCD_DrawRectangle(player->currentCenter - PADDLE_LEN_D2,
-                          player->currentCenter + PADDLE_LEN_D2,
-                          BOTTOM_PLAYER_CENTER_Y - PADDLE_WID_D2,
-                          BOTTOM_PLAYER_CENTER_Y + PADDLE_WID_D2,
-                          player->color);
-    }
-}
-
+/*
+ * Generate Ball thread
+ */
 void GenerateBall(){
     while(1){
         // Add a ball based on the number of balls
@@ -311,6 +208,49 @@ void GenerateBall(){
     }
 }
 
+/*
+ * Thread to read host's joystick
+ */
+void ReadJoystickHost(){
+    while(1){
+        // Read joystick coordinates
+        int16_t joyX = 0;
+        int16_t joyY = 0;
+        GetJoystickCoordinates(&joyX, &joyY);
+        // Divide by scale, can be adjusted later, also probably need to add bias later
+        // Also need to make sure the difference bewteen the two joyX values are not greater than
+        joyX = joyX / 2000;
+        // Sleep for 10 ms
+        OS_Sleep(10);
+        // Add joystick to bottom player
+        G8RTOS_WaitSemaphore(&sensorMutex);
+        if((players[0].currentCenter -= joyX) < HORIZ_CENTER_MIN_PL){
+            players[0].currentCenter = HORIZ_CENTER_MIN_PL;
+        }
+        else if((players[0].currentCenter -= joyX) > HORIZ_CENTER_MAX_PL){
+            players[0].currentCenter = HORIZ_CENTER_MAX_PL;
+        }
+        else{
+            players[0].currentCenter -= joyX;
+        }
+        // Add joystick to top player for testing purposes
+        if((players[1].currentCenter -= joyX) < HORIZ_CENTER_MIN_PL){
+            players[1].currentCenter = HORIZ_CENTER_MIN_PL;
+        }
+        else if((players[1].currentCenter -= joyX) > HORIZ_CENTER_MAX_PL){
+            players[1].currentCenter = HORIZ_CENTER_MAX_PL;
+        }
+        else{
+            players[1].currentCenter -= joyX;
+        }
+        G8RTOS_SignalSemaphore(&sensorMutex);
+    }
+}
+
+
+/*
+ * Thread to move a single ball
+ */
 void MoveBall(){
     // Find a dead ball to make it alive
     int i;
@@ -393,42 +333,237 @@ void MoveBall(){
     }
 }
 
-void ReadJoystickHost(){
+/*
+ * End of game for the host
+ */
+void EndOfGameHost(){
+    // Wait for all semaphores to be released, although need to make sure no deadlocks so maybe need to change later
+    G8RTOS_WaitSemaphore(&LCDMutex);
+    G8RTOS_WaitSemaphore(&LEDMutex);
+    G8RTOS_WaitSemaphore(&sensorMutex);
+    G8RTOS_WaitSemaphore(&ballMutex);
+    // Kill all other threads
+    G8RTOS_KillOthers();
+    // Kill all balls
+    int i;
+    for(i = 0; i < MAX_NUM_OF_BALLS; i++){
+        balls[i].alive = false;
+    }
+    // Re-initialize all semaphores
+    G8RTOS_SignalSemaphore(&LCDMutex);
+    G8RTOS_SignalSemaphore(&LEDMutex);
+    G8RTOS_SignalSemaphore(&sensorMutex);
+    G8RTOS_SignalSemaphore(&ballMutex);
+    G8RTOS_InitSemaphore(&LCDMutex, 1);
+    G8RTOS_InitSemaphore(&LEDMutex, 1);
+    G8RTOS_InitSemaphore(&sensorMutex, 1);
+    G8RTOS_InitSemaphore(&ballMutex, 1);
+    // Clear screen with winner's color
+    if(points_bottom >= points_top){
+        LCD_Clear(LCD_BLUE);
+    }
+    else{
+        LCD_Clear(LCD_RED);
+    }
+    // Print message to wait for restart
+    uint8_t str[] = "Wait for Restart...";
+    LCD_Text(MAX_SCREEN_X / 4, MAX_SCREEN_Y / 2, str, LCD_WHITE);
+    // Create aperiodic thread that waits for restart from host - TODO
+    // G8RTOS_AddAPeriodicEvent(LCDTap, 4, PORT4_IRQn);
+    // Decide to maybe just add the thread in the beginning and we can just enable the interrupt here
+    flagButton = false;
+    P4->IFG &= ~BIT4;
+    P4->IE |= BIT4;
+    G8RTOS_AddAPeriodicEvent(buttonPress, 4, PORT4_IRQn);
+    // Wait for button to set a global flag
+    while(!flagButton);
+    // Send notification to client - TODO - probably done in CreateGame() instead
+
+    // Re-initialize
+    G8RTOS_AddThread(CreateGame, 4, "create");
+    // Kill self
+    G8RTOS_KillSelf();
+}
+
+/*********************************************** Host Threads *********************************************************************/
+
+/*********************************************** Common Threads *********************************************************************/
+/*
+ * Idle thread
+ */
+void Idle()
+{
+    while(1);
+}
+
+/*
+ * Thread to draw all the objects in the game
+ */
+void DrawObjects(){
     while(1){
-        // Read joystick coordinates
-        int16_t joyX = 0;
-        int16_t joyY = 0;
-        GetJoystickCoordinates(&joyX, &joyY);
-        // Divide by scale, can be adjusted later, also probably need to add bias later
-        // Also need to make sure the difference bewteen the two joyX values are not greater than
-        joyX = joyX / 2000;
-        // Sleep for 10 ms
-        OS_Sleep(10);
-        // Add joystick to bottom player
+        // Temporary: check if game ends, will move to another thread later
+        if(gameOver){
+            G8RTOS_AddThread(EndOfGameHost, 3, "end");
+            OS_Sleep(1);
+        }
+        // iterates through all the alive balls
+        int i;
+        for(i = 0; i < MAX_NUM_OF_BALLS; i++){
+            if(balls[i].alive){
+                // call the function to update the ball's drawing
+                G8RTOS_WaitSemaphore(&ballMutex);
+                G8RTOS_WaitSemaphore(&LCDMutex);
+                UpdateBallOnScreen(&prevBalls[i], &balls[i], balls[i].color);
+                G8RTOS_SignalSemaphore(&LCDMutex);
+                // update previous ball's position
+                prevBalls[i].CenterX = balls[i].currentCenterX;
+                prevBalls[i].CenterY = balls[i].currentCenterY;
+                G8RTOS_SignalSemaphore(&ballMutex);
+            }
+        }
+        // players[0] is bottom and players[1] is top
+        // call the functions to update the players' drawings
         G8RTOS_WaitSemaphore(&sensorMutex);
-        if((players[0].currentCenter -= joyX) < HORIZ_CENTER_MIN_PL){
-            players[0].currentCenter = HORIZ_CENTER_MIN_PL;
-        }
-        else if((players[0].currentCenter -= joyX) > HORIZ_CENTER_MAX_PL){
-            players[0].currentCenter = HORIZ_CENTER_MAX_PL;
-        }
-        else{
-            players[0].currentCenter -= joyX;
-        }
-        // Add joystick to top player for testing purposes
-        if((players[1].currentCenter -= joyX) < HORIZ_CENTER_MIN_PL){
-            players[1].currentCenter = HORIZ_CENTER_MIN_PL;
-        }
-        else if((players[1].currentCenter -= joyX) > HORIZ_CENTER_MAX_PL){
-            players[1].currentCenter = HORIZ_CENTER_MAX_PL;
-        }
-        else{
-            players[1].currentCenter -= joyX;
-        }
+        G8RTOS_WaitSemaphore(&LCDMutex);
+        UpdatePlayerOnScreen(&prevPlayers[0], &players[0]);
+        UpdatePlayerOnScreen(&prevPlayers[1], &players[1]);
+        G8RTOS_SignalSemaphore(&LCDMutex);
+        // update the previous players' positions
+        prevPlayers[0].Center = players[0].currentCenter;
+        prevPlayers[1].Center = players[1].currentCenter;
         G8RTOS_SignalSemaphore(&sensorMutex);
+        // sleep for 20 ms
+        OS_Sleep(20);
     }
 }
 
+/*
+ * Thread to update LEDs based on score
+ */
+void MoveLEDs(){
+    while(1){
+        G8RTOS_WaitSemaphore(&LEDMutex);
+        LP3943_LedModeSet(BLUE, blueLED);
+        LP3943_LedModeSet(RED, redLED);
+        G8RTOS_SignalSemaphore(&LEDMutex);
+        // may change later
+        OS_Sleep(10);
+    }
+}
+/*********************************************** Common Threads *********************************************************************/
+
+/*********************************************** Public Functions *********************************************************************/
+/*
+ * Returns either Host or Client depending on button press
+ */
+playerType GetPlayerRole();
+
+/*
+ * Draw players given center X center coordinate
+ */
+void DrawPlayer(GeneralPlayerInfo_t * player){
+    if(player->position == TOP){
+        // currentCenter is just the x-position since y will always stay the same
+        LCD_DrawRectangle(player->currentCenter - PADDLE_LEN_D2,
+                          player->currentCenter + PADDLE_LEN_D2,
+                          TOP_PLAYER_CENTER_Y - PADDLE_WID_D2,
+                          TOP_PLAYER_CENTER_Y + PADDLE_WID_D2,
+                          player->color);
+    }
+    else{
+        LCD_DrawRectangle(player->currentCenter - PADDLE_LEN_D2,
+                          player->currentCenter + PADDLE_LEN_D2,
+                          BOTTOM_PLAYER_CENTER_Y - PADDLE_WID_D2,
+                          BOTTOM_PLAYER_CENTER_Y + PADDLE_WID_D2,
+                          player->color);
+    }
+}
+
+/*
+ * Updates player's paddle based on current and new center
+ */
+void UpdatePlayerOnScreen(PrevPlayer_t * prevPlayerIn, GeneralPlayerInfo_t * outPlayer){
+    // check to see which player, then set up corresponding values for the Y upper and lower bounds
+    uint8_t upperBound = ARENA_MIN_Y;
+    uint8_t lowerBound = TOP_PADDLE_EDGE;
+    if(outPlayer->position == BOTTOM){
+        upperBound = BOTTOM_PADDLE_EDGE;
+        lowerBound = ARENA_MAX_Y;
+    }
+    // Compare the old and new center positions, keep all the overlapping squares and update the remaining ones
+    // if move to the right
+    if(outPlayer->currentCenter > prevPlayerIn->Center){
+        // calculate overlapping bounds
+        // one problem with this implementation is that the paddle MUST NOT move too far in one update cycle so there is no overlap
+        int16_t leftBound = outPlayer->currentCenter - PADDLE_LEN_D2;
+        int16_t rightBound = prevPlayerIn->Center + PADDLE_LEN_D2;
+        // clear the tail
+        LCD_DrawRectangle(prevPlayerIn->Center - PADDLE_LEN_D2,
+                          leftBound,
+                          upperBound,
+                          lowerBound,
+                          LCD_BLACK);
+        // update the head
+        LCD_DrawRectangle(rightBound,
+                          outPlayer->currentCenter + PADDLE_LEN_D2,
+                          upperBound,
+                          lowerBound,
+                          outPlayer->color);
+    }
+    // else move to the left
+    else if(outPlayer->currentCenter < prevPlayerIn->Center){
+        // calculate overlapping bounds
+        // one problem with this implementation is that the paddle MUST NOT move too far in one update cycle so there is no overlap
+        int16_t leftBound = prevPlayerIn->Center - PADDLE_LEN_D2;
+        int16_t rightBound = outPlayer->currentCenter + PADDLE_LEN_D2;
+        // clear the tail
+        LCD_DrawRectangle(rightBound,
+                          prevPlayerIn->Center + PADDLE_LEN_D2,
+                          upperBound,
+                          lowerBound,
+                          LCD_BLACK);
+        // update the head
+        LCD_DrawRectangle(outPlayer->currentCenter - PADDLE_LEN_D2,
+                          leftBound,
+                          upperBound,
+                          lowerBound,
+                          outPlayer->color);
+    }
+}
+
+/*
+ * Function updates ball position on screen
+ */
+void UpdateBallOnScreen(PrevBall_t * previousBall, Ball_t * currentBall, uint16_t outColor){
+    // if the previous ball's position is 0, then this ball has just been initialized
+    if(previousBall->CenterX == 0){
+        LCD_DrawRectangle(currentBall->currentCenterX - BALL_SIZE_D2,
+                          currentBall->currentCenterX + BALL_SIZE_D2,
+                          currentBall->currentCenterY - BALL_SIZE_D2,
+                          currentBall->currentCenterY + BALL_SIZE_D2,
+                          outColor);
+    }
+    // else we just clear previous position and update to new position
+    else{
+        LCD_DrawRectangle(previousBall->CenterX - BALL_SIZE_D2,
+                          previousBall->CenterX + BALL_SIZE_D2,
+                          previousBall->CenterY - BALL_SIZE_D2,
+                          previousBall->CenterY + BALL_SIZE_D2,
+                          LCD_BLACK);
+        LCD_DrawRectangle(currentBall->currentCenterX - BALL_SIZE_D2,
+                          currentBall->currentCenterX + BALL_SIZE_D2,
+                          currentBall->currentCenterY - BALL_SIZE_D2,
+                          currentBall->currentCenterY + BALL_SIZE_D2,
+                          outColor);
+    }
+}
+
+/*
+ * Initializes and prints initial game state
+ */
+void InitBoardState();
+
+// check for collision
 uint8_t checkCollision(Ball_t * ball, GeneralPlayerInfo_t * player){
     int32_t widthA = BALL_SIZE + WIGGLE_ROOM;
     int32_t widthB = PADDLE_LEN;
@@ -474,6 +609,14 @@ uint8_t checkCollision(Ball_t * ball, GeneralPlayerInfo_t * player){
     return 0;
 }
 
+// Aperiodic interrupt
+void buttonPress(){
+    __NVIC_DisableIRQ(PORT4_IRQn);
+    P4->IE &= ~BIT4;
+    flagButton = true;
+}
+
+// get random velocity
 int16_t genRandVelo(){
     //srand(time(0));
     int16_t velo = (int16_t)(rand()%16 - 8);
@@ -482,19 +625,4 @@ int16_t genRandVelo(){
     }
     return velo;
 }
-
-void JoinGame(){
-    // set specific player info, probably call getLoaclIP() to get IP
-
-    // send player info to host
-
-    // wait for server response
-
-    // send acknowledge, light LED
-
-    // Initialize board state
-
-    //
-
-}
-
+/*********************************************** Public Functions *********************************************************************/

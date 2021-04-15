@@ -248,7 +248,7 @@ void EndOfGameHost();
 /*
  * Idle thread
  */
-void IdleThread();
+void Idle();
 
 /*
  * Thread to draw all the objects in the game

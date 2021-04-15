@@ -146,7 +146,7 @@ s32 bme280_data_readout_template(void)
 	/* The variable used to read real humidity*/
 	u32 v_actual_humity_u32 = BME280_INIT_VALUE;
 	/* result of communication results*/
-	s32 com_rslt = ERROR;
+	s32 com_rslt = ERROR_BME;
 
 
 
@@ -275,7 +275,7 @@ return com_rslt;
 BME280_RETURN_FUNCTION_TYPE bme280_initialize_sensor(void)
 {
 	/* result of communication results*/
-	s32 com_rslt = ERROR;
+	s32 com_rslt = ERROR_BME;
 
 	  #ifdef BME280_API
 		I2C_routine();
@@ -389,7 +389,7 @@ s8 SPI_routine(void) {
  */
 s8 BME280_I2C_bus_write(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt)
 {
-	s32 iError = BME280_INIT_VALUE;
+	s32 iERROR_BME = BME280_INIT_VALUE;
 	writeI2C(dev_addr, reg_addr, reg_data, cnt);
 	#ifdef INCLUDE_BME280API_
 	u8 array[I2C_BUFFER_LEN];
@@ -401,11 +401,11 @@ s8 BME280_I2C_bus_write(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt)
 	/*
 	* Please take the below function as your reference for
 	* write the data using I2C communication
-	* "IERROR = I2C_WRITE_STRING(DEV_ADDR, ARRAY, CNT+1)"
+	* "IERROR_BME = I2C_WRITE_STRING(DEV_ADDR, ARRAY, CNT+1)"
 	* add your I2C write function here
-	* iError is an return value of I2C read function
+	* iERROR_BME is an return value of I2C read function
 	* Please select your valid return value
-	* In the driver SUCCESS defined as 0
+	* In the driver SUCCESS_BME defined as 0
     * and FAILURE defined as -1
 	* Note :
 	* This is a full duplex operation,
@@ -414,7 +414,7 @@ s8 BME280_I2C_bus_write(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt)
 	* For more information please refer data sheet SPI communication:
 	*/
 	#endif
-	return (s8)iError;
+	return (s8)iERROR_BME;
 }
 
  /*	\Brief: The function is used as I2C bus read
@@ -426,7 +426,7 @@ s8 BME280_I2C_bus_write(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt)
  */
 s8 BME280_I2C_bus_read(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt)
 {
-	s32 iError = BME280_INIT_VALUE;
+	s32 iERROR_BME = BME280_INIT_VALUE;
 
 	readI2C(dev_addr, reg_addr, reg_data, cnt);
 
@@ -437,17 +437,17 @@ s8 BME280_I2C_bus_read(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt)
 	/* Please take the below function as your reference
 	 * for read the data using I2C communication
 	 * add your I2C rad function here.
-	 * "IERROR = I2C_WRITE_READ_STRING(DEV_ADDR, ARRAY, ARRAY, 1, CNT)"
-	 * iError is an return value of SPI write function
+	 * "IERROR_BME = I2C_WRITE_READ_STRING(DEV_ADDR, ARRAY, ARRAY, 1, CNT)"
+	 * iERROR_BME is an return value of SPI write function
 	 * Please select your valid return value
-     * In the driver SUCCESS defined as 0
+     * In the driver SUCCESS_BME defined as 0
      * and FAILURE defined as -1
 	 */
 	for (stringpos = BME280_INIT_VALUE; stringpos < cnt; stringpos++) {
 		*(reg_data + stringpos) = array[stringpos];
 	}
 	#endif
-	return (s8)iError;
+	return (s8)iERROR_BME;
 }
 
 /*	\Brief: The function is used as SPI bus read
@@ -459,7 +459,7 @@ s8 BME280_I2C_bus_read(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt)
  */
 s8 BME280_SPI_bus_read(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt)
 {
-	s32 iError=BME280_INIT_VALUE;
+	s32 iERROR_BME=BME280_INIT_VALUE;
 	u8 array[SPI_BUFFER_LEN]={MASK_DATA1};
 	u8 stringpos;
 	/*	For the SPI mode only 7 bits of register addresses are used.
@@ -469,11 +469,11 @@ s8 BME280_SPI_bus_read(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt)
 	/*
 	* Please take the below function as your reference for
 	* read the data using SPI communication
-	* " IERROR = SPI_READ_WRITE_STRING(ARRAY, ARRAY, CNT+1)"
+	* " IERROR_BME = SPI_READ_WRITE_STRING(ARRAY, ARRAY, CNT+1)"
 	* add your SPI read function here
-	* iError is an return value of SPI read function
+	* iERROR_BME is an return value of SPI read function
 	* Please select your valid return value
-	* In the driver SUCCESS defined as 0
+	* In the driver SUCCESS_BME defined as 0
     * and FAILURE defined as -1
 	* Note :
 	* This is a full duplex operation,
@@ -485,7 +485,7 @@ s8 BME280_SPI_bus_read(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt)
 	for (stringpos = BME280_INIT_VALUE; stringpos < cnt; stringpos++) {
 		*(reg_data + stringpos) = array[stringpos+BME280_ONE_U8X];
 	}
-	return (s8)iError;
+	return (s8)iERROR_BME;
 }
 
 /*	\Brief: The function is used as SPI bus write
@@ -498,7 +498,7 @@ s8 BME280_SPI_bus_read(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt)
  */
 s8 BME280_SPI_bus_write(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt)
 {
-	s32 iError = BME280_INIT_VALUE;
+	s32 iERROR_BME = BME280_INIT_VALUE;
 	u8 array[SPI_BUFFER_LEN * BME280_TWO_U8X];
 	u8 stringpos = BME280_INIT_VALUE;
 	for (stringpos = BME280_INIT_VALUE; stringpos < cnt; stringpos++) {
@@ -511,13 +511,13 @@ s8 BME280_SPI_bus_write(u8 dev_addr, u8 reg_addr, u8 *reg_data, u8 cnt)
 	/* Please take the below function as your reference
 	 * for write the data using SPI communication
 	 * add your SPI write function here.
-	 * "IERROR = SPI_WRITE_STRING(ARRAY, CNT*2)"
-	 * iError is an return value of SPI write function
+	 * "IERROR_BME = SPI_WRITE_STRING(ARRAY, CNT*2)"
+	 * iERROR_BME is an return value of SPI write function
 	 * Please select your valid return value
-	 * In the driver SUCCESS defined as 0
+	 * In the driver SUCCESS_BME defined as 0
      * and FAILURE defined as -1
 	 */
-	return (s8)iError;
+	return (s8)iERROR_BME;
 }
 
 /*	Brief : The delay routine

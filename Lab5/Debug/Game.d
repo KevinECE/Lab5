@@ -87,6 +87,10 @@ Game.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/G8RTOS_Empty_Lab2/G8RTOS
 Game.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/G8RTOS_Empty_Lab2/Threads.h
 Game.obj: ../Game.h
 Game.obj: C:/Users/Matthew\ Merriman/workspace_v10/Lab5/G8RTOS_Empty_Lab2/G8RTOS.h
+Game.obj: C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.4.LTS/include/stdlib.h
+Game.obj: C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.4.LTS/include/time.h
+Game.obj: C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.4.LTS/include/abi_prefix.h
+Game.obj: C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.4.LTS/include/xlocale/_time.h
 
 ../Game.c: 
 ../LCDLib.h: 
@@ -175,3 +179,7 @@ C:/Users/Matthew\ Merriman/workspace_v10/Lab5/G8RTOS_Empty_Lab2/G8RTOS_Semaphore
 C:/Users/Matthew\ Merriman/workspace_v10/Lab5/G8RTOS_Empty_Lab2/Threads.h: 
 ../Game.h: 
 C:/Users/Matthew\ Merriman/workspace_v10/Lab5/G8RTOS_Empty_Lab2/G8RTOS.h: 
+C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.4.LTS/include/stdlib.h: 
+C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.4.LTS/include/time.h: 
+C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.4.LTS/include/abi_prefix.h: 
+C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.4.LTS/include/xlocale/_time.h: 

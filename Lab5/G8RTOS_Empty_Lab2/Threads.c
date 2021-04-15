@@ -91,10 +91,6 @@ void WaitForTap(){
     }
 }
 
-void Idle(){
-    while(1);
-}
-
 void Ball(){
     int i;
     for(i = 0; i < 20; i++){

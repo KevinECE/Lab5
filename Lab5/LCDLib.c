@@ -99,16 +99,36 @@ void LCD_DrawRectangle(int16_t xStart, int16_t xEnd, int16_t yStart, int16_t yEn
 
     /* Check special cases for out of bounds */
     if((xStart < 0) || (xStart > (MAX_SCREEN_X - 1))){
-        xStart = 0;
+        if(xStart < 0){
+            xStart = 0;
+        }
+        else{
+            xStart = MAX_SCREEN_X - 1;
+        }
     }
     if((yStart < 0) || (yStart > (MAX_SCREEN_Y - 1))){
-        yStart = 0;
+        if(yStart < 0){
+            yStart = 0;
+        }
+        else{
+            yStart = MAX_SCREEN_Y - 1;
+        }
     }
     if((xEnd < 0) || (xEnd > (MAX_SCREEN_X - 1))){
-        xEnd = 0;
+        if(xEnd < 0){
+            xEnd = 0;
+        }
+        else{
+            xEnd = MAX_SCREEN_X - 1;
+        }
     }
     if((yEnd < 0) || (yEnd > (MAX_SCREEN_Y - 1))){
-        yEnd = 0;
+        if(yEnd < 0){
+            yEnd = 0;
+        }
+        else{
+            yEnd = MAX_SCREEN_Y - 1;
+        }
     }
     if(xStart > xEnd){
         int16_t temp = xStart;

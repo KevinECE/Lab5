@@ -295,6 +295,9 @@ uint8_t checkCollision(Ball_t * ball, GeneralPlayerInfo_t * player);
 // Aperiodic interrupt
 void buttonPress();
 
+// get random velocity
+int16_t genRandVelo();
+
 /*********************************************** Public Functions *********************************************************************/
 
 

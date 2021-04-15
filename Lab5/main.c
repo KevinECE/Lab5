@@ -100,11 +100,7 @@ void main(void)
 
     LCD_Init(1);
 
-    //uint8_t str[] = "Hello";
-    //LCD_Text(MAX_SCREEN_X / 2, MAX_SCREEN_Y / 2, str, LCD_WHITE);
-
-    //initFIFO(0);
-    //initFIFO(1);
+    initCC3100(Client);
 
     P4->DIR &= ~BIT4;
     P4->IFG &= ~BIT4; // P4.4 IFG cleared
@@ -112,36 +108,13 @@ void main(void)
     P4->REN |= BIT4; // Pull-up resistor
     P4->OUT |= BIT4; // Sets res to pull-up
 
-    //G8RTOS_AddThread(ReadAccel, 5, "read accel");
-    //G8RTOS_AddThread(WaitForTap, 5, "wait tap");
-    //G8RTOS_AddThread(startGame, 5, "read accel");
-    //G8RTOS_AddThread(WaitForTap, 5, "wait tap");
-    //G8RTOS_AddThread(Idle, 6, "idle");
-    //G8RTOS_AddAPeriodicEvent(LCDTap, 5, PORT4_IRQn);
-
-    G8RTOS_AddThread(CreateGame, 4, "create");
+    //    G8RTOS_AddThread(CreateGame, 4, "create");
     //G8RTOS_AddAPeriodicEvent(buttonPress, 4, PORT4_IRQn);
 
     G8RTOS_InitSemaphore(&sensorMutex, 1);
     G8RTOS_InitSemaphore(&ballMutex, 1);
     G8RTOS_InitSemaphore(&LCDMutex, 1);
     G8RTOS_InitSemaphore(&LEDMutex, 1);
-
-    /*while(1){
-        Point temp = TP_ReadXY();
-    }*/
-
-	/*
-	P2->DIR |= BIT0;
-	P2->REN |= BIT0;
-	P2->OUT |= BIT0; // High output
-	P2->DIR |= BIT1;
-    P2->REN |= BIT1;
-    P2->OUT |= BIT1; // High output
-    P2->DIR |= BIT2;
-    P2->REN |= BIT2;
-    P2->OUT |= BIT2; // High output
-    */
 
 	G8RTOS_Launch();
 }

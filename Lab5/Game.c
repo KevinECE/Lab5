@@ -16,6 +16,7 @@
 #include "Game.h"
 #include <stdlib.h>
 #include <time.h>
+#include <stdbool.h>
 
 semaphore_t LCDMutex;
 semaphore_t LEDMutex;
@@ -23,10 +24,12 @@ semaphore_t sensorMutex;
 semaphore_t ballMutex;
 
 
+
 int16_t scaleX = 1;                                     // Scaling factors for velocities of balls
 int16_t scaleY = 1;
 Ball_t balls[MAX_NUM_OF_BALLS];                         // All the balls
 GeneralPlayerInfo_t players[MAX_NUM_OF_PLAYERS];        // All the players
+// set specific player info, probably call getLoaclIP() to get IP
 SpecificPlayerInfo_t clientPlayer;                      // Player info
 GameState_t gameState;                                  // Game state
 PrevBall_t prevBalls[MAX_NUM_OF_BALLS];                 // Previous ball positions
@@ -43,27 +46,43 @@ bool flagButton = false;                                // Button press flag for
  * Thread for client to join game
  */
 void JoinGame(){
-    // set specific player info, probably call getLoaclIP() to get IP
+    // Set initial SpecificPlayerInfo_tstrict attributes (you can get the IP address by calling getLocalIP()
     clientPlayer = (SpecificPlayerInfo_t) {
         .IP_address   = getLocalIP(),
         .displacement = 0,
         .playerNumber = 1,
-        .acknowledge  = 0,
-        .ready        = 0,
-        .joined       = 1
+        .acknowledge  = false,
+        .ready        = false,
+        .joined       = true
     };
 
     // send player info to host
     SendData((uint8_t *)&clientPlayer, clientPlayer.IP_address, sizeof(clientPlayer));
 
-    // wait for server response
+    // wait for server response with ready = true
+    int32_t retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+    while(clientPlayer.ready == false)
+    {
+        retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+    }
 
     // send acknowledge, light LED
+    clientPlayer.acknowledge = true;
+    LP3943_LedModeSet(GREEN, 0);
+    SendData((uint8_t *)&clientPlayer, clientPlayer.IP_address, sizeof(clientPlayer));
 
-    // Initialize board state
+    // Initialize the board
+    InitBoardState();
 
-    //
-
+    // Add all threads
+    G8RTOS_AddThread(GenerateBall, 4, "gen ball");
+    G8RTOS_AddThread(DrawObjects, 4, "draw obj");
+    G8RTOS_AddThread(ReadJoystickHost, 4, "joystick");
+    //G8RTOS_AddThread(SendDataToClient, 4, "send data");
+    //G8RTOS_AddThread(ReceiveDataFromClient, 4, "get data");
+    G8RTOS_AddThread(MoveLEDs, 5, "LEDs");
+    G8RTOS_AddThread(Idle, 6, "idle");
+    G8RTOS_KillSelf();
 }
 
 /*
@@ -71,12 +90,15 @@ void JoinGame(){
  */
 void ReceiveDataFromHost()
 {
-    int32_t retVal = ReceiveData();
-
-    // Continually receive data until retVal > 0 (meaning valid data has been read)
-    while(!(retVal > 0))
+    while(1)
     {
-        retVal = ReceiveData((uint8_t *)&gameState, sizeof(gameState));
+        int32_t retVal = ReceiveData((uint8_t *)&gameState, sizeof(gameState));
+
+        // Continually receive data until retVal > 0 (meaning valid data has been read)
+        while(!(retVal > 0))
+        {
+            retVal = ReceiveData((uint8_t *)&gameState, sizeof(gameState));
+        }
     }
 }
 
@@ -85,10 +107,13 @@ void ReceiveDataFromHost()
  */
 void SendDataToHost()
 {
-    // send player info to host
-    SendData((uint8_t *)&clientPlayer, clientPlayer.IP_address, sizeof(clientPlayer));
-    // sleep for 2ms
-    OS_Sleep(2);
+    while(1)
+    {
+        // send player info to host
+        SendData((uint8_t *)&clientPlayer, clientPlayer.IP_address, sizeof(clientPlayer));
+        // sleep for 2ms
+        OS_Sleep(2);
+    }
 }
 
 /*
@@ -128,21 +153,25 @@ void CreateGame(){
     points_bottom = 0;
     redLED = 0;
     blueLED = 0;
-    // Establish connection with client - TODO
+
+    // Establish connection with client
+    int32_t connectClient = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+
+    // Wait for client response with joined = true
+    while(clientPlayer.joined == false)
+    {
+        connectClient = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+    }
+
+    // Wait for acknowledge
+    while(clientPlayer.acknowledge == false)
+    {
+        connectClient = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+    }
 
     // Initialize the board
-    G8RTOS_WaitSemaphore(&LCDMutex);
-    // Clear Screen
-    LCD_Clear(LCD_BLACK);
-    // Draw arena, which consists of 4 rectangles as 4 sides.
-    //LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_Y, ARENA_MIN_Y, LCD_WHITE);
-    //LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MAX_Y, ARENA_MAX_Y, LCD_WHITE);
-    LCD_DrawRectangle(ARENA_MIN_X - 5, ARENA_MIN_X - 5, ARENA_MIN_Y, ARENA_MAX_Y, LCD_WHITE);
-    LCD_DrawRectangle(ARENA_MAX_X + 5, ARENA_MAX_X + 5, ARENA_MIN_Y, ARENA_MAX_Y, LCD_WHITE);
-    // Draw players
-    LCD_DrawRectangle(160 - 32, 160 + 32, 0, 4, LCD_WHITE);
-    LCD_DrawRectangle(160 - 32, 160 + 32, 236, 240, LCD_WHITE);
-    G8RTOS_SignalSemaphore(&LCDMutex);
+    InitBoardState();
+
     // Add all threads
     G8RTOS_AddThread(GenerateBall, 4, "gen ball");
     G8RTOS_AddThread(DrawObjects, 4, "draw obj");
@@ -159,16 +188,19 @@ void CreateGame(){
  */
 void SendDataToClient()
 {
-    // Send packet
-    SendData((uint8_t *)&gameState, getLocalIP(), sizeof(gameState));
-
-    // Check if game is done
-    if(gameOver == 1)
+    while(1)
     {
-        G8RTOS_AddThread(EndOfGameHost(), 0, "End game");
-    }
+        // Send packet
+        SendData((uint8_t *)&gameState, getLocalIP(), sizeof(gameState));
 
-    OS_Sleep(5);
+        // Check if game is done
+        if(gameOver == 1)
+        {
+            G8RTOS_AddThread(EndOfGameHost, 3, "End game");
+        }
+
+        OS_Sleep(5);
+    }
 }
 
 /*
@@ -176,12 +208,15 @@ void SendDataToClient()
  */
 void ReceiveDataFromClient()
 {
-    int32_t retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
-
-    // Continually receive data until retVal > 0 (meaning valid data has been read)
-    while(!(retVal > 0))
+    while(1)
     {
-        retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+        int32_t retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+
+        // Continually receive data until retVal > 0 (meaning valid data has been read)
+        while(!(retVal > 0))
+        {
+            retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+        }
     }
 }
 
@@ -441,6 +476,9 @@ void DrawObjects(){
  * Thread to update LEDs based on score
  */
 void MoveLEDs(){
+    LP3943_LedModeSet(BLUE, 0);
+    LP3943_LedModeSet(RED, 0);
+    LP3943_LedModeSet(GREEN,0);
     while(1){
         G8RTOS_WaitSemaphore(&LEDMutex);
         LP3943_LedModeSet(BLUE, blueLED);
@@ -453,11 +491,6 @@ void MoveLEDs(){
 /*********************************************** Common Threads *********************************************************************/
 
 /*********************************************** Public Functions *********************************************************************/
-/*
- * Returns either Host or Client depending on button press
- */
-playerType GetPlayerRole();
-
 /*
  * Draw players given center X center coordinate
  */
@@ -561,7 +594,21 @@ void UpdateBallOnScreen(PrevBall_t * previousBall, Ball_t * currentBall, uint16_
 /*
  * Initializes and prints initial game state
  */
-void InitBoardState();
+void InitBoardState(){
+
+    G8RTOS_WaitSemaphore(&LCDMutex);
+    // Clear Screen
+    LCD_Clear(LCD_BLACK);
+    // Draw arena, which consists of 4 rectangles as 4 sides.
+    //LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MIN_Y, ARENA_MIN_Y, LCD_WHITE);
+    //LCD_DrawRectangle(ARENA_MIN_X, ARENA_MAX_X, ARENA_MAX_Y, ARENA_MAX_Y, LCD_WHITE);
+    LCD_DrawRectangle(ARENA_MIN_X - 5, ARENA_MIN_X - 5, ARENA_MIN_Y, ARENA_MAX_Y, LCD_WHITE);
+    LCD_DrawRectangle(ARENA_MAX_X + 5, ARENA_MAX_X + 5, ARENA_MIN_Y, ARENA_MAX_Y, LCD_WHITE);
+    // Draw players
+    LCD_DrawRectangle(160 - 32, 160 + 32, 0, 4, LCD_WHITE);
+    LCD_DrawRectangle(160 - 32, 160 + 32, 236, 240, LCD_WHITE);
+    G8RTOS_SignalSemaphore(&LCDMutex);
+}
 
 // check for collision
 uint8_t checkCollision(Ball_t * ball, GeneralPlayerInfo_t * player){

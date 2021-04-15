@@ -265,11 +265,6 @@ void MoveLEDs();
 
 /*********************************************** Public Functions *********************************************************************/
 /*
- * Returns either Host or Client depending on button press
- */
-playerType GetPlayerRole();
-
-/*
  * Draw players given center X center coordinate
  */
 void DrawPlayer(GeneralPlayerInfo_t * player);

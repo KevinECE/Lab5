@@ -12,6 +12,7 @@ extern semaphore_t sensorMutex;
 extern semaphore_t ballMutex;
 extern semaphore_t LEDMutex;
 extern semaphore_t LCDMutex;
+extern semaphore_t dataMutex;
 
 uint32_t counter0;
 uint32_t counter1;
@@ -126,6 +127,7 @@ void main(void)
     G8RTOS_InitSemaphore(&ballMutex, 1);
     G8RTOS_InitSemaphore(&LCDMutex, 1);
     G8RTOS_InitSemaphore(&LEDMutex, 1);
+    G8RTOS_InitSemaphore(&dataMutex, 1);
 
     /*while(1){
         Point temp = TP_ReadXY();
@@ -142,6 +144,17 @@ void main(void)
     P2->REN |= BIT2;
     P2->OUT |= BIT2; // High output
     */
+
+    initCC3100(Client);
+    /*uint32_t boardIP = getLocalIP();
+    uint32_t computerIP = HOST_IP_ADDR;
+    int32_t tempData = 0;
+    //SendData((uint8_t *)&boardIP, computerIP, sizeof(boardIP));
+    int32_t retVal = ReceiveData((uint8_t *)&tempData, sizeof(tempData));
+    while(!(retVal >= 0)){
+        retVal = ReceiveData((uint8_t *)&tempData, sizeof(tempData));
+    }
+    while(1);*/
 
 	G8RTOS_Launch();
 }

@@ -152,7 +152,7 @@ typedef struct
     uint16_t numberOfBalls;
     bool winner;
     bool gameDone;
-    uint8_t LEDScores[2];
+    uint16_t LEDScores[2];
     uint8_t overallScores[2];
 } GameState_t;
 #pragma pack ( pop )
@@ -248,7 +248,7 @@ void EndOfGameHost();
 /*
  * Idle thread
  */
-void IdleThread();
+//void IdleThread();
 
 /*
  * Thread to draw all the objects in the game

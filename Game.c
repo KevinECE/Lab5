@@ -73,7 +73,7 @@ void JoinGame(){
     uint16_t LEDScores[2] = {blueLED, redLED};
     uint8_t overallScores[2] = {points_bottom, points_top};
     clientPlayer = (SpecificPlayerInfo_t) {
-        .IP_address   = 0,
+        .IP_address   = getLocalIP(),
         .displacement = 0,
         .playerNumber = 1,
         .acknowledge  = false,
@@ -82,7 +82,7 @@ void JoinGame(){
     };
     gameState = (GameState_t) {
         .player = (SpecificPlayerInfo_t) {
-            .IP_address   = getLocalIP(),
+            .IP_address   = 0,
             .displacement = 0,
             .playerNumber = 0,
             .acknowledge  = false,
@@ -209,6 +209,8 @@ void ReadJoystickClient(){
         else{
             players[1].currentCenter -= joyX;
         }
+        // Add to displacement
+        clientPlayer.displacement = joyX;
         G8RTOS_SignalSemaphore(&sensorMutex);
         // Sleep for 10 ms
         OS_Sleep(10);
@@ -413,7 +415,7 @@ void SendDataToClient()
         G8RTOS_SignalSemaphore(&dataMutex);
 
         // Check if game is done
-        if(gameOver == 1)
+        if(gameOver)
         {
             G8RTOS_AddThread(EndOfGameHost, 3, "End game");
         }

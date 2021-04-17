@@ -1,3 +1,34 @@
+Skip to content
+Search or jump to…
+
+Pull requests
+Issues
+Marketplace
+Explore
+
+@KevinECE
+KevinECE
+/
+Lab5
+1
+00
+Code
+Issues
+Pull requests
+Actions
+Projects
+Wiki
+Security
+Insights
+Settings
+Lab5/Game.c
+@x15000177
+x15000177 bug fix
+Latest commit 23aad4b 4 hours ago
+ History
+ 1 contributor
+920 lines (867 sloc)  30.7 KB
+
 /*
  * Game.c
  *
@@ -17,12 +48,13 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdbool.h>
+#include <string.h>
 
 semaphore_t LCDMutex;
 semaphore_t LEDMutex;
 semaphore_t sensorMutex;
 semaphore_t ballMutex;
-
+semaphore_t dataMutex;
 
 
 int16_t scaleX = 1;                                     // Scaling factors for velocities of balls
@@ -47,39 +79,87 @@ bool flagButton = false;                                // Button press flag for
  */
 void JoinGame(){
     // Set initial SpecificPlayerInfo_tstrict attributes (you can get the IP address by calling getLocalIP()
+    // Initialize the players
+    int i;
+    for(i = 0; i < MAX_NUM_OF_PLAYERS; i++){
+        players[i].color = LCD_WHITE;
+        players[i].currentCenter = PADDLE_X_CENTER;
+        if(i == 0){
+            // bottom
+            players[i].position = BOTTOM;
+        }
+        if(i == 1){
+            // top
+            players[i].position = TOP;
+        }
+        prevPlayers[i].Center = players[i].currentCenter;
+    }
+    // Initialize the points
+    gameOver = 0;
+    points_top = 0;
+    points_bottom = 0;
+    redLED = 0;
+    blueLED = 0;
+    // Initialize the player info
+    uint16_t LEDScores[2] = {blueLED, redLED};
+    uint8_t overallScores[2] = {points_bottom, points_top};
     clientPlayer = (SpecificPlayerInfo_t) {
         .IP_address   = getLocalIP(),
         .displacement = 0,
         .playerNumber = 1,
         .acknowledge  = false,
         .ready        = false,
-        .joined       = true
+        .joined       = false
     };
+    gameState = (GameState_t) {
+        .player = (SpecificPlayerInfo_t) {
+            .IP_address   = 0,
+            .displacement = 0,
+            .playerNumber = 0,
+            .acknowledge  = false,
+            .ready        = false,
+            .joined       = false
+        },
+        .numberOfBalls = 0,
+        .winner = false,
+        .gameDone = false,
+    };
+    memcpy(&gameState.players, &players, sizeof(gameState.players));
+    memcpy(&gameState.balls, &balls, sizeof(gameState.players));
+    memcpy(&gameState.LEDScores, &LEDScores, sizeof(LEDScores));
+    memcpy(&gameState.overallScores, &overallScores, sizeof(overallScores));
 
     // send player info to host
-    SendData((uint8_t *)&clientPlayer, clientPlayer.IP_address, sizeof(clientPlayer));
+    clientPlayer.joined = true;
+    G8RTOS_WaitSemaphore(&dataMutex);
+    SendData((uint8_t *)&clientPlayer, HOST_IP_ADDR, sizeof(clientPlayer));
+    G8RTOS_SignalSemaphore(&dataMutex);
 
     // wait for server response with ready = true
-    int32_t retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
-    while(clientPlayer.ready == false)
+    int32_t retVal = -1;
+    while(!(retVal >= 0) || (gameState.player.ready == false))
     {
-        retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+        G8RTOS_WaitSemaphore(&dataMutex);
+        retVal = ReceiveData((uint8_t *)&gameState, sizeof(gameState));
+        G8RTOS_SignalSemaphore(&dataMutex);
     }
+    clientPlayer.ready = gameState.player.ready;
 
     // send acknowledge, light LED
     clientPlayer.acknowledge = true;
-    LP3943_LedModeSet(GREEN, 0);
-    SendData((uint8_t *)&clientPlayer, clientPlayer.IP_address, sizeof(clientPlayer));
+    G8RTOS_WaitSemaphore(&dataMutex);
+    SendData((uint8_t *)&clientPlayer, HOST_IP_ADDR, sizeof(clientPlayer));
+    G8RTOS_SignalSemaphore(&dataMutex);
+    //LP3943_LedModeSet(GREEN, 0);
 
     // Initialize the board
     InitBoardState();
 
     // Add all threads
-    G8RTOS_AddThread(GenerateBall, 4, "gen ball");
     G8RTOS_AddThread(DrawObjects, 4, "draw obj");
-    G8RTOS_AddThread(ReadJoystickHost, 4, "joystick");
-    //G8RTOS_AddThread(SendDataToClient, 4, "send data");
-    //G8RTOS_AddThread(ReceiveDataFromClient, 4, "get data");
+    G8RTOS_AddThread(ReadJoystickClient, 4, "joystick");
+    G8RTOS_AddThread(SendDataToHost, 4, "send data");
+    G8RTOS_AddThread(ReceiveDataFromHost, 4, "get data");
     G8RTOS_AddThread(MoveLEDs, 5, "LEDs");
     G8RTOS_AddThread(Idle, 6, "idle");
     G8RTOS_KillSelf();
@@ -92,13 +172,32 @@ void ReceiveDataFromHost()
 {
     while(1)
     {
-        int32_t retVal = ReceiveData((uint8_t *)&gameState, sizeof(gameState));
+        int32_t retVal = -1;
 
         // Continually receive data until retVal > 0 (meaning valid data has been read)
-        while(!(retVal > 0))
+        while(!(retVal >= 0))
         {
+            G8RTOS_WaitSemaphore(&dataMutex);
             retVal = ReceiveData((uint8_t *)&gameState, sizeof(gameState));
+            G8RTOS_SignalSemaphore(&dataMutex);
+            OS_Sleep(1);
         }
+
+        // Empty the package
+        memcpy(&players, &gameState.players, sizeof(players));
+        memcpy(&balls, &gameState.balls, sizeof(balls));
+        gameOver = gameState.gameDone;
+        blueLED = gameState.LEDScores[0];
+        redLED = gameState.LEDScores[1];
+        points_bottom = gameState.overallScores[0];
+        points_top = gameState.overallScores[1];
+
+        // Check if game is done
+        if(gameOver){
+           G8RTOS_AddThread(EndOfGameClient, 3, "end");
+        }
+        // Sleep 5 ms
+        OS_Sleep(5);
     }
 }
 
@@ -110,7 +209,9 @@ void SendDataToHost()
     while(1)
     {
         // send player info to host
-        SendData((uint8_t *)&clientPlayer, clientPlayer.IP_address, sizeof(clientPlayer));
+        G8RTOS_WaitSemaphore(&dataMutex);
+        SendData((uint8_t *)&clientPlayer, HOST_IP_ADDR, sizeof(clientPlayer));
+        G8RTOS_SignalSemaphore(&dataMutex);
         // sleep for 2ms
         OS_Sleep(2);
     }
@@ -119,12 +220,87 @@ void SendDataToHost()
 /*
  * Thread to read client's joystick
  */
-void ReadJoystickClient();
+void ReadJoystickClient(){
+    while(1){
+        // Read joystick coordinates
+        int16_t joyX = 0;
+        int16_t joyY = 0;
+        GetJoystickCoordinates(&joyX, &joyY);
+        // Divide by scale, can be adjusted later, also probably need to add bias later
+        // Also need to make sure the difference bewteen the two joyX values are not greater than
+        joyX = joyX / 2000;
+        G8RTOS_WaitSemaphore(&sensorMutex);
+        //Add joystick to top player purposes
+        if((players[1].currentCenter -= joyX) < HORIZ_CENTER_MIN_PL){
+            players[1].currentCenter = HORIZ_CENTER_MIN_PL;
+        }
+        else if((players[1].currentCenter -= joyX) > HORIZ_CENTER_MAX_PL){
+            players[1].currentCenter = HORIZ_CENTER_MAX_PL;
+        }
+        else{
+            players[1].currentCenter -= joyX;
+        }
+        // Add to displacement
+        clientPlayer.displacement = joyX;
+        G8RTOS_SignalSemaphore(&sensorMutex);
+        // Sleep for 10 ms
+        OS_Sleep(10);
+    }
+}
 
 /*
  * End of game for the client
  */
-void EndOfGameClient();
+void EndOfGameClient(){
+    // Wait for all semaphores to be released, although need to make sure no deadlocks so maybe need to change later
+    G8RTOS_WaitSemaphore(&LCDMutex);
+    G8RTOS_WaitSemaphore(&LEDMutex);
+    G8RTOS_WaitSemaphore(&sensorMutex);
+    G8RTOS_WaitSemaphore(&ballMutex);
+    G8RTOS_WaitSemaphore(&dataMutex);
+    // Kill all other threads
+    G8RTOS_KillOthers();
+    // Kill all balls
+    int i;
+    for(i = 0; i < MAX_NUM_OF_BALLS; i++){
+        balls[i].alive = false;
+    }
+    // Re-initialize all semaphores
+    G8RTOS_SignalSemaphore(&LCDMutex);
+    G8RTOS_SignalSemaphore(&LEDMutex);
+    G8RTOS_SignalSemaphore(&sensorMutex);
+    G8RTOS_SignalSemaphore(&ballMutex);
+    G8RTOS_SignalSemaphore(&dataMutex);
+    G8RTOS_InitSemaphore(&LCDMutex, 1);
+    G8RTOS_InitSemaphore(&LEDMutex, 1);
+    G8RTOS_InitSemaphore(&sensorMutex, 1);
+    G8RTOS_InitSemaphore(&ballMutex, 1);
+    G8RTOS_InitSemaphore(&dataMutex, 1);
+    // Clear screen with winner's color
+    if(points_bottom >= points_top){
+        LCD_Clear(LCD_BLUE);
+    }
+    else{
+        LCD_Clear(LCD_RED);
+    }
+    // Print message to wait for restart
+    uint8_t str[] = "Wait for Restart...";
+    LCD_Text(MAX_SCREEN_X / 4, MAX_SCREEN_Y / 2, str, LCD_WHITE);
+    // Wait for host to restart game
+    // wait for server response with ready = true
+    gameState.player.ready = false;
+    int32_t retVal = -1;
+    while(!(retVal >= 0) || (gameState.player.ready == false))
+    {
+        G8RTOS_WaitSemaphore(&dataMutex);
+        retVal = ReceiveData((uint8_t *)&gameState, sizeof(gameState));
+        G8RTOS_SignalSemaphore(&dataMutex);
+    }
+    // Add all threads back
+    G8RTOS_AddThread(JoinGame, 4, "join");
+    // Kill self
+    G8RTOS_KillSelf();
+}
 /*********************************************** Client Threads *********************************************************************/
 
 /*********************************************** Host Threads *********************************************************************/
@@ -153,21 +329,62 @@ void CreateGame(){
     points_bottom = 0;
     redLED = 0;
     blueLED = 0;
+    // Initialize the player info
+    uint16_t LEDScores[2] = {blueLED, redLED};
+    uint8_t overallScores[2] = {points_bottom, points_top};
+    clientPlayer = (SpecificPlayerInfo_t) {
+        .IP_address   = 0,
+        .displacement = 0,
+        .playerNumber = 1,
+        .acknowledge  = false,
+        .ready        = false,
+        .joined       = false
+    };
+    gameState = (GameState_t) {
+        .player = (SpecificPlayerInfo_t) {
+            .IP_address   = getLocalIP(),
+            .displacement = 0,
+            .playerNumber = 0,
+            .acknowledge  = false,
+            .ready        = false,
+            .joined       = false
+        },
+        .numberOfBalls = 0,
+        .winner = false,
+        .gameDone = false,
+    };
+    memcpy(&gameState.players, &players, sizeof(gameState.players));
+    memcpy(&gameState.balls, &balls, sizeof(gameState.players));
+    memcpy(&gameState.LEDScores, &LEDScores, sizeof(LEDScores));
+    memcpy(&gameState.overallScores, &overallScores, sizeof(overallScores));
 
     // Establish connection with client
-    int32_t connectClient = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+    int32_t retVal = -1;
 
     // Wait for client response with joined = true
-    while(clientPlayer.joined == false)
+    while(!(retVal >= 0) || (clientPlayer.joined == false))
     {
-        connectClient = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+        G8RTOS_WaitSemaphore(&dataMutex);
+        retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+        G8RTOS_SignalSemaphore(&dataMutex);
     }
+    gameState.player.joined = clientPlayer.joined;
+    retVal = -1;
+
+    // Send ready to client
+    gameState.player.ready = true;
+    G8RTOS_WaitSemaphore(&dataMutex);
+    SendData((uint8_t *)&gameState, HOST_IP_ADDR, sizeof(gameState));
+    G8RTOS_SignalSemaphore(&dataMutex);
 
     // Wait for acknowledge
-    while(clientPlayer.acknowledge == false)
+    while(!(retVal >= 0) || (clientPlayer.acknowledge == false))
     {
-        connectClient = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+        G8RTOS_WaitSemaphore(&dataMutex);
+        retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+        G8RTOS_SignalSemaphore(&dataMutex);
     }
+    gameState.player.acknowledge = clientPlayer.acknowledge;
 
     // Initialize the board
     InitBoardState();
@@ -176,8 +393,8 @@ void CreateGame(){
     G8RTOS_AddThread(GenerateBall, 4, "gen ball");
     G8RTOS_AddThread(DrawObjects, 4, "draw obj");
     G8RTOS_AddThread(ReadJoystickHost, 4, "joystick");
-    //G8RTOS_AddThread(SendDataToClient, 4, "send data");
-    //G8RTOS_AddThread(ReceiveDataFromClient, 4, "get data");
+    G8RTOS_AddThread(SendDataToClient, 4, "send data");
+    G8RTOS_AddThread(ReceiveDataFromClient, 4, "get data");
     G8RTOS_AddThread(MoveLEDs, 5, "LEDs");
     G8RTOS_AddThread(Idle, 6, "idle");
     G8RTOS_KillSelf();
@@ -190,11 +407,46 @@ void SendDataToClient()
 {
     while(1)
     {
+        G8RTOS_WaitSemaphore(&dataMutex);
+
+        // Fill packet for client
+        uint16_t numberOfBalls = 0;
+        int i;
+        for(i = 0; i < MAX_NUM_OF_BALLS; i++){
+            if(balls[i].alive){
+                numberOfBalls++;
+            }
+        }
+        bool winner = (points_bottom >= points_top) ? false : true;
+        bool gameDone = (bool)gameOver;
+        uint16_t LEDScores[2] = {blueLED, redLED};
+        uint8_t overallScores[2] = {points_bottom, points_top};
+
+        gameState = (GameState_t) {
+            .player = (SpecificPlayerInfo_t) {
+                .IP_address   = getLocalIP(),
+                .displacement = 0,
+                .playerNumber = 0,
+                .acknowledge  = true,
+                .ready        = true,
+                .joined       = true
+            },
+            .numberOfBalls = numberOfBalls,
+            .winner = winner,
+            .gameDone = gameDone,
+        };
+        memcpy(&gameState.players, &players, sizeof(gameState.players));
+        memcpy(&gameState.balls, &balls, sizeof(gameState.players));
+        memcpy(&gameState.LEDScores, &LEDScores, sizeof(LEDScores));
+        memcpy(&gameState.overallScores, &overallScores, sizeof(overallScores));
+
         // Send packet
-        SendData((uint8_t *)&gameState, getLocalIP(), sizeof(gameState));
+        SendData((uint8_t *)&gameState, HOST_IP_ADDR, sizeof(gameState));
+
+        G8RTOS_SignalSemaphore(&dataMutex);
 
         // Check if game is done
-        if(gameOver == 1)
+        if(gameOver)
         {
             G8RTOS_AddThread(EndOfGameHost, 3, "End game");
         }
@@ -210,13 +462,32 @@ void ReceiveDataFromClient()
 {
     while(1)
     {
-        int32_t retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+        int32_t retVal = -1;
 
-        // Continually receive data until retVal > 0 (meaning valid data has been read)
-        while(!(retVal > 0))
+        // Continually receive data until retVal >= 0 (meaning valid data has been read)
+        while(!(retVal >= 0))
         {
+            G8RTOS_WaitSemaphore(&dataMutex);
             retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
+            G8RTOS_SignalSemaphore(&dataMutex);
+            OS_Sleep(1);
         }
+
+        // Update the client's position
+        int16_t joyX = clientPlayer.displacement;
+        if((players[1].currentCenter -= joyX) < HORIZ_CENTER_MIN_PL){
+            players[1].currentCenter = HORIZ_CENTER_MIN_PL;
+        }
+        else if((players[1].currentCenter -= joyX) > HORIZ_CENTER_MAX_PL){
+            players[1].currentCenter = HORIZ_CENTER_MAX_PL;
+        }
+        else{
+            players[1].currentCenter -= joyX;
+        }
+
+        // Sleep 2 ms
+        OS_Sleep(2);
+
     }
 }
 
@@ -269,7 +540,7 @@ void ReadJoystickHost(){
             players[0].currentCenter -= joyX;
         }
         // Add joystick to top player for testing purposes
-        if((players[1].currentCenter -= joyX) < HORIZ_CENTER_MIN_PL){
+        /*if((players[1].currentCenter -= joyX) < HORIZ_CENTER_MIN_PL){
             players[1].currentCenter = HORIZ_CENTER_MIN_PL;
         }
         else if((players[1].currentCenter -= joyX) > HORIZ_CENTER_MAX_PL){
@@ -277,7 +548,7 @@ void ReadJoystickHost(){
         }
         else{
             players[1].currentCenter -= joyX;
-        }
+        }*/
         G8RTOS_SignalSemaphore(&sensorMutex);
     }
 }
@@ -377,6 +648,7 @@ void EndOfGameHost(){
     G8RTOS_WaitSemaphore(&LEDMutex);
     G8RTOS_WaitSemaphore(&sensorMutex);
     G8RTOS_WaitSemaphore(&ballMutex);
+    G8RTOS_WaitSemaphore(&dataMutex);
     // Kill all other threads
     G8RTOS_KillOthers();
     // Kill all balls
@@ -389,10 +661,12 @@ void EndOfGameHost(){
     G8RTOS_SignalSemaphore(&LEDMutex);
     G8RTOS_SignalSemaphore(&sensorMutex);
     G8RTOS_SignalSemaphore(&ballMutex);
+    G8RTOS_SignalSemaphore(&dataMutex);
     G8RTOS_InitSemaphore(&LCDMutex, 1);
     G8RTOS_InitSemaphore(&LEDMutex, 1);
     G8RTOS_InitSemaphore(&sensorMutex, 1);
     G8RTOS_InitSemaphore(&ballMutex, 1);
+    G8RTOS_InitSemaphore(&dataMutex, 1);
     // Clear screen with winner's color
     if(points_bottom >= points_top){
         LCD_Clear(LCD_BLUE);
@@ -403,9 +677,9 @@ void EndOfGameHost(){
     // Print message to wait for restart
     uint8_t str[] = "Wait for Restart...";
     LCD_Text(MAX_SCREEN_X / 4, MAX_SCREEN_Y / 2, str, LCD_WHITE);
-    // Create aperiodic thread that waits for restart from host - TODO
-    // G8RTOS_AddAPeriodicEvent(LCDTap, 4, PORT4_IRQn);
-    // Decide to maybe just add the thread in the beginning and we can just enable the interrupt here
+    // Change the current status to be not ready
+    gameState.player.ready = false;
+    // Create aperiodic thread that waits for restart from host
     flagButton = false;
     P4->IFG &= ~BIT4;
     P4->IE |= BIT4;
@@ -413,7 +687,10 @@ void EndOfGameHost(){
     // Wait for button to set a global flag
     while(!flagButton);
     // Send notification to client - TODO - probably done in CreateGame() instead
-
+    gameState.player.ready = true;
+    G8RTOS_WaitSemaphore(&dataMutex);
+    SendData((uint8_t *)&gameState, HOST_IP_ADDR, sizeof(gameState));
+    G8RTOS_SignalSemaphore(&dataMutex);
     // Re-initialize
     G8RTOS_AddThread(CreateGame, 4, "create");
     // Kill self
@@ -426,10 +703,10 @@ void EndOfGameHost(){
 /*
  * Idle thread
  */
-void Idle()
+/*void Idle()
 {
     while(1);
-}
+}*/
 
 /*
  * Thread to draw all the objects in the game
@@ -672,4 +949,16 @@ int16_t genRandVelo(){
     }
     return velo;
 }
-/*********************************************** Public Functions *********************************************************************/
+© 2021 GitHub, Inc.
+Terms
+Privacy
+Security
+Status
+Docs
+Contact GitHub
+Pricing
+API
+Training
+Blog
+About
+Loading complete

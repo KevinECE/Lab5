@@ -1,3 +1,34 @@
+Skip to content
+Search or jump to…
+
+Pull requests
+Issues
+Marketplace
+Explore
+
+@KevinECE
+KevinECE
+/
+Lab5
+1
+00
+Code
+Issues
+Pull requests
+Actions
+Projects
+Wiki
+Security
+Insights
+Settings
+Lab5/main.c
+@x15000177
+x15000177 Finished writing everything, needs testing
+Latest commit 5c86d6a yesterday
+ History
+ 1 contributor
+160 lines (135 sloc)  3.95 KB
+
 #include "msp.h"
 #include <driverlib.h>
 #include "G8RTOS_Scheduler.h"
@@ -12,6 +43,7 @@ extern semaphore_t sensorMutex;
 extern semaphore_t ballMutex;
 extern semaphore_t LEDMutex;
 extern semaphore_t LCDMutex;
+extern semaphore_t dataMutex;
 
 uint32_t counter0;
 uint32_t counter1;
@@ -92,15 +124,19 @@ void PORT4_IRQHandler(void){
  */
 void main(void)
 {
-	WDT_A->CTL = WDT_A_CTL_PW | WDT_A_CTL_HOLD;		// stop watchdog timer
+    WDT_A->CTL = WDT_A_CTL_PW | WDT_A_CTL_HOLD;     // stop watchdog timer
 
-	G8RTOS_Init();
+    G8RTOS_Init();
 
     uartInit();
 
     LCD_Init(1);
 
-    initCC3100(Client);
+    //uint8_t str[] = "Hello";
+    //LCD_Text(MAX_SCREEN_X / 2, MAX_SCREEN_Y / 2, str, LCD_WHITE);
+
+    //initFIFO(0);
+    //initFIFO(1);
 
     P4->DIR &= ~BIT4;
     P4->IFG &= ~BIT4; // P4.4 IFG cleared
@@ -108,13 +144,61 @@ void main(void)
     P4->REN |= BIT4; // Pull-up resistor
     P4->OUT |= BIT4; // Sets res to pull-up
 
-    //    G8RTOS_AddThread(CreateGame, 4, "create");
+    //G8RTOS_AddThread(ReadAccel, 5, "read accel");
+    //G8RTOS_AddThread(WaitForTap, 5, "wait tap");
+    //G8RTOS_AddThread(startGame, 5, "read accel");
+    //G8RTOS_AddThread(WaitForTap, 5, "wait tap");
+    //G8RTOS_AddThread(Idle, 6, "idle");
+    //G8RTOS_AddAPeriodicEvent(LCDTap, 5, PORT4_IRQn);
+
+    G8RTOS_AddThread(CreateGame, 4, "create");
     //G8RTOS_AddAPeriodicEvent(buttonPress, 4, PORT4_IRQn);
 
     G8RTOS_InitSemaphore(&sensorMutex, 1);
     G8RTOS_InitSemaphore(&ballMutex, 1);
     G8RTOS_InitSemaphore(&LCDMutex, 1);
     G8RTOS_InitSemaphore(&LEDMutex, 1);
+    G8RTOS_InitSemaphore(&dataMutex, 1);
 
-	G8RTOS_Launch();
+    /*while(1){
+        Point temp = TP_ReadXY();
+    }*/
+
+    /*
+    P2->DIR |= BIT0;
+    P2->REN |= BIT0;
+    P2->OUT |= BIT0; // High output
+    P2->DIR |= BIT1;
+    P2->REN |= BIT1;
+    P2->OUT |= BIT1; // High output
+    P2->DIR |= BIT2;
+    P2->REN |= BIT2;
+    P2->OUT |= BIT2; // High output
+    */
+
+    initCC3100(Client);
+    /*uint32_t boardIP = getLocalIP();
+    uint32_t computerIP = HOST_IP_ADDR;
+    int32_t tempData = 0;
+    //SendData((uint8_t *)&boardIP, computerIP, sizeof(boardIP));
+    int32_t retVal = ReceiveData((uint8_t *)&tempData, sizeof(tempData));
+    while(!(retVal >= 0)){
+        retVal = ReceiveData((uint8_t *)&tempData, sizeof(tempData));
+    }
+    while(1);*/
+
+    G8RTOS_Launch();
 }
+© 2021 GitHub, Inc.
+Terms
+Privacy
+Security
+Status
+Docs
+Contact GitHub
+Pricing
+API
+Training
+Blog
+About
+Loading complete

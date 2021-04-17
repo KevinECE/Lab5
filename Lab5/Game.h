@@ -1,3 +1,34 @@
+Skip to content
+Search or jump to…
+
+Pull requests
+Issues
+Marketplace
+Explore
+
+@KevinECE
+KevinECE
+/
+Lab5
+1
+00
+Code
+Issues
+Pull requests
+Actions
+Projects
+Wiki
+Security
+Insights
+Settings
+Lab5/Game.h
+@x15000177
+x15000177 Finished writing everything, needs testing
+Latest commit 5c86d6a yesterday
+ History
+ 1 contributor
+304 lines (241 sloc)  8 KB
+
 /*
  * Game.h
  *
@@ -152,7 +183,7 @@ typedef struct
     uint16_t numberOfBalls;
     bool winner;
     bool gameDone;
-    uint8_t LEDScores[2];
+    uint16_t LEDScores[2];
     uint8_t overallScores[2];
 } GameState_t;
 #pragma pack ( pop )
@@ -248,7 +279,7 @@ void EndOfGameHost();
 /*
  * Idle thread
  */
-void Idle();
+//void IdleThread();
 
 /*
  * Thread to draw all the objects in the game
@@ -264,6 +295,11 @@ void MoveLEDs();
 
 
 /*********************************************** Public Functions *********************************************************************/
+/*
+ * Returns either Host or Client depending on button press
+ */
+playerType GetPlayerRole();
+
 /*
  * Draw players given center X center coordinate
  */
@@ -297,3 +333,16 @@ int16_t genRandVelo();
 
 
 #endif /* GAME_H_ */
+© 2021 GitHub, Inc.
+Terms
+Privacy
+Security
+Status
+Docs
+Contact GitHub
+Pricing
+API
+Training
+Blog
+About
+Loading complete

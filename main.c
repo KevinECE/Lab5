@@ -146,15 +146,15 @@ void main(void)
     */
 
     initCC3100(Client);
-    /*uint32_t boardIP = getLocalIP();
-    uint32_t computerIP = HOST_IP_ADDR;
-    int32_t tempData = 0;
+    //uint32_t boardIP = getLocalIP();
+    //uint32_t computerIP = HOST_IP_ADDR;
+    //int32_t tempData = 0;
     //SendData((uint8_t *)&boardIP, computerIP, sizeof(boardIP));
-    int32_t retVal = ReceiveData((uint8_t *)&tempData, sizeof(tempData));
-    while(!(retVal >= 0)){
-        retVal = ReceiveData((uint8_t *)&tempData, sizeof(tempData));
-    }
-    while(1);*/
+    //int32_t retVal = ReceiveData((uint8_t *)&tempData, sizeof(tempData));
+    //while(!(retVal >= 0)){
+        //retVal = ReceiveData((uint8_t *)&tempData, sizeof(tempData));
+    //}
+    //while(1);
 
 	G8RTOS_Launch();
 }

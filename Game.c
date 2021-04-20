@@ -127,7 +127,7 @@ void JoinGame(){
     // Add all threads
     G8RTOS_AddThread(DrawObjects, 4, "draw obj");
     G8RTOS_AddThread(ReadJoystickClient, 4, "joystick");
-    G8RTOS_AddThread(SendDataToHost, 4, "send data");
+    //G8RTOS_AddThread(SendDataToHost, 4, "send data");
     G8RTOS_AddThread(ReceiveDataFromHost, 4, "get data");
     G8RTOS_AddThread(MoveLEDs, 5, "LEDs");
     G8RTOS_AddThread(Idle, 6, "idle");
@@ -143,7 +143,7 @@ void ReceiveDataFromHost()
     {
         int32_t retVal = -1;
 
-        // Continually receive data until retVal > 0 (meaning valid data has been read)
+        // Continually receive data until retVal >= 0 (meaning valid data has been read)
         while(!(retVal >= 0))
         {
             G8RTOS_WaitSemaphore(&dataMutex);
@@ -153,6 +153,8 @@ void ReceiveDataFromHost()
         }
 
         // Empty the package
+        G8RTOS_WaitSemaphore(&sensorMutex);
+        G8RTOS_WaitSemaphore(&ballMutex);
         memcpy(&players, &gameState.players, sizeof(players));
         memcpy(&balls, &gameState.balls, sizeof(balls));
         gameOver = gameState.gameDone;
@@ -160,13 +162,15 @@ void ReceiveDataFromHost()
         redLED = gameState.LEDScores[1];
         points_bottom = gameState.overallScores[0];
         points_top = gameState.overallScores[1];
+        G8RTOS_SignalSemaphore(&ballMutex);
+        G8RTOS_SignalSemaphore(&sensorMutex);
 
         // Check if game is done
         if(gameOver){
            G8RTOS_AddThread(EndOfGameClient, 3, "end");
         }
         // Sleep 5 ms
-        OS_Sleep(5);
+        OS_Sleep(3);
     }
 }
 
@@ -359,11 +363,11 @@ void CreateGame(){
     InitBoardState();
 
     // Add all threads
-    G8RTOS_AddThread(GenerateBall, 4, "gen ball");
+    //G8RTOS_AddThread(GenerateBall, 4, "gen ball");
     G8RTOS_AddThread(DrawObjects, 4, "draw obj");
     G8RTOS_AddThread(ReadJoystickHost, 4, "joystick");
     G8RTOS_AddThread(SendDataToClient, 4, "send data");
-    G8RTOS_AddThread(ReceiveDataFromClient, 4, "get data");
+    //G8RTOS_AddThread(ReceiveDataFromClient, 4, "get data");
     G8RTOS_AddThread(MoveLEDs, 5, "LEDs");
     G8RTOS_AddThread(Idle, 6, "idle");
     G8RTOS_KillSelf();
@@ -376,8 +380,6 @@ void SendDataToClient()
 {
     while(1)
     {
-        G8RTOS_WaitSemaphore(&dataMutex);
-
         // Fill packet for client
         uint16_t numberOfBalls = 0;
         int i;
@@ -409,8 +411,16 @@ void SendDataToClient()
         memcpy(&gameState.LEDScores, &LEDScores, sizeof(LEDScores));
         memcpy(&gameState.overallScores, &overallScores, sizeof(overallScores));
 
+        G8RTOS_WaitSemaphore(&dataMutex);
+
         // Send packet
         SendData((uint8_t *)&gameState, HOST_IP_ADDR, sizeof(gameState));
+        // Testing System time
+        /*int16_t temp = gameState.players[0].currentCenter - prevPlayers[0].Center;
+        uint32_t sysTime = 0;
+        if((temp > 10) || (temp < -10)){
+            sysTime = SystemTime;
+        }*/
 
         G8RTOS_SignalSemaphore(&dataMutex);
 
@@ -439,10 +449,11 @@ void ReceiveDataFromClient()
             G8RTOS_WaitSemaphore(&dataMutex);
             retVal = ReceiveData((uint8_t *)&clientPlayer, sizeof(clientPlayer));
             G8RTOS_SignalSemaphore(&dataMutex);
-            OS_Sleep(1);
+            OS_Sleep(2);
         }
 
         // Update the client's position
+        G8RTOS_WaitSemaphore(&sensorMutex);
         int16_t joyX = clientPlayer.displacement;
         if((players[1].currentCenter -= joyX) < HORIZ_CENTER_MIN_PL){
             players[1].currentCenter = HORIZ_CENTER_MIN_PL;
@@ -453,6 +464,7 @@ void ReceiveDataFromClient()
         else{
             players[1].currentCenter -= joyX;
         }
+        G8RTOS_SignalSemaphore(&sensorMutex);
 
         // Sleep 2 ms
         OS_Sleep(2);
@@ -683,10 +695,10 @@ void EndOfGameHost(){
 void DrawObjects(){
     while(1){
         // Temporary: check if game ends, will move to another thread later
-        if(gameOver){
+        /*if(gameOver){
             G8RTOS_AddThread(EndOfGameHost, 3, "end");
             OS_Sleep(1);
-        }
+        }*/
         // iterates through all the alive balls
         int i;
         for(i = 0; i < MAX_NUM_OF_BALLS; i++){
